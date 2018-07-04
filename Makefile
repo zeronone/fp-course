@@ -25,7 +25,7 @@ test:
 	$(stack) test $(package)
 
 test-ghci:
-	$(stack) ghci $(package):test:$(package)-tests
+	$(stack) exec ghci -- -isrc -itest test/Spec.hs
 
 bench:
 	$(stack) bench $(package)
