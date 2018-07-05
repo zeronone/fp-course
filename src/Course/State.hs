@@ -1,18 +1,19 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE InstanceSigs        #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE RebindableSyntax    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE RebindableSyntax #-}
 
 module Course.State where
 
-import Course.Core
-import qualified Prelude as P
-import Course.Optional
-import Course.List
-import Course.Functor
-import Course.Applicative
-import Course.Monad
-import qualified Data.Set as S
+import           Course.Applicative
+import           Course.Core
+import           Course.Functor
+import           Course.List
+import           Course.Monad
+import           Course.Optional
+import qualified Data.Char          as Char
+import qualified Data.Set           as S
+import qualified Prelude            as P
 
 -- $setup
 -- >>> import Test.QuickCheck.Function
@@ -31,6 +32,11 @@ newtype State s a =
       -> (a, s)
   }
 
+-- Also known as Owl operator.
+-- Some call it the boobs operator, but DUDE that is offensive!!
+(.:) :: (b -> c) -> (a1 -> a -> b) -> a1 -> a -> c
+(.:) = (.) . (.)
+
 -- | Run the `State` seeded with `s` and retrieve the resulting state.
 --
 -- prop> \(Fun _ f) s -> exec (State f) s == snd (runState (State f) s)
@@ -38,8 +44,7 @@ exec ::
   State s a
   -> s
   -> s
-exec =
-  error "todo: Course.State#exec"
+exec = snd .: runState
 
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 --
@@ -48,8 +53,7 @@ eval ::
   State s a
   -> s
   -> a
-eval =
-  error "todo: Course.State#eval"
+eval = fst .: runState
 
 -- | A `State` where the state also distributes into the produced value.
 --
@@ -57,8 +61,7 @@ eval =
 -- (0,0)
 get ::
   State s s
-get =
-  error "todo: Course.State#get"
+get = State (\s -> (s,s))
 
 -- | A `State` where the resulting state is seeded with the given value.
 --
@@ -67,8 +70,7 @@ get =
 put ::
   s
   -> State s ()
-put =
-  error "todo: Course.State#put"
+put s = State (\_ -> ((), s))
 
 -- | Implement the `Functor` instance for `State s`.
 --
@@ -79,8 +81,8 @@ instance Functor (State s) where
     (a -> b)
     -> State s a
     -> State s b
-  (<$>) =
-    error "todo: Course.State#(<$>)"
+  f <$> sa = State $ \s -> case runState sa s of
+    (a, s') -> (f a, s')
 
 -- | Implement the `Applicative` instance for `State s`.
 --
@@ -97,14 +99,15 @@ instance Applicative (State s) where
   pure ::
     a
     -> State s a
-  pure =
-    error "todo: Course.State pure#instance (State s)"
+  pure a =
+    State $ \s -> (a,s)
   (<*>) ::
     State s (a -> b)
     -> State s a
-    -> State s b 
-  (<*>) =
-    error "todo: Course.State (<*>)#instance (State s)"
+    -> State s b
+  sf <*> sa = State $ \s -> case runState sf s of
+    (f, s') -> case runState sa s' of
+      (a, s'') -> (f a, s'')
 
 -- | Implement the `Bind` instance for `State s`.
 --
@@ -118,8 +121,8 @@ instance Monad (State s) where
     (a -> State s b)
     -> State s a
     -> State s b
-  (=<<) =
-    error "todo: Course.State (=<<)#instance (State s)"
+  f =<< ma = State $ \s -> case runState ma s of
+    (a, s') -> runState (f a) s'
 
 -- | Find the first element in a `List` that satisfies a given predicate.
 -- It is possible that no element is found, hence an `Optional` result.
@@ -140,8 +143,12 @@ findM ::
   (a -> f Bool)
   -> List a
   -> f (Optional a)
-findM =
-  error "todo: Course.State#findM"
+findM _ Nil = return Empty
+findM p (x:.xs) = do
+  result <- p x
+  case result of
+    True  -> return $ Full x
+    False -> findM p xs
 
 -- | Find the first element in a `List` that repeats.
 -- It is possible that no element repeats, hence an `Optional` result.
@@ -154,8 +161,16 @@ firstRepeat ::
   Ord a =>
   List a
   -> Optional a
-firstRepeat =
-  error "todo: Course.State#firstRepeat"
+firstRepeat lst = fst $ runState (findFirstRepeat lst) S.empty
+  where findFirstRepeat Nil = pure Empty
+        findFirstRepeat (a:.as) = do
+          set <- get
+          case a `S.member` set of
+            True -> return $ Full a
+            False -> do
+              put $ S.insert a set
+              findFirstRepeat as
+
 
 -- | Remove all duplicate elements in a `List`.
 -- /Tip:/ Use `filtering` and `State` with a @Data.Set#Set@.
@@ -167,8 +182,15 @@ distinct ::
   Ord a =>
   List a
   -> List a
-distinct =
-  error "todo: Course.State#distinct"
+distinct lst = fst $ runState (filtering appearedBefore lst) S.empty
+  where appearedBefore a = do
+          set <- get
+          case a `S.member` set of
+            True -> pure False
+            False -> do
+              put $ S.insert a set
+              return True
+
 
 -- | A happy number is a positive integer, where the sum of the square of its digits eventually reaches 1 after repetition.
 -- In contrast, a sad number (not a happy number) is where the sum of the square of its digits never reaches 1
@@ -194,5 +216,17 @@ distinct =
 isHappy ::
   Integer
   -> Bool
-isHappy =
-  error "todo: Course.State#isHappy"
+isHappy num =  go Nil $ toDigits num
+  where square = join (*)
+        squareOfDigits = sum . P.fmap square
+        toDigits :: Integral a => a -> List Int
+        toDigits = (Char.digitToInt <$>) . listh . show . toInteger
+        go :: List Int -> List Int -> Bool
+        go accm digits = case squareOfDigits digits of
+          1 -> True
+          n -> let newDigits = n :. accm in
+            case firstRepeat newDigits of
+              Full _ -> False
+              Empty  -> go newDigits $ toDigits n
+
+
