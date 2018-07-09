@@ -1,21 +1,21 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE InstanceSigs        #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RebindableSyntax    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE RebindableSyntax #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Course.StateT where
 
-import Course.Core
-import Course.ExactlyOne
-import Course.Optional
-import Course.List
-import Course.Functor
-import Course.Applicative
-import Course.Monad
-import Course.State
-import qualified Data.Set as S
-import qualified Prelude as P
+import           Course.Applicative
+import           Course.Core
+import           Course.ExactlyOne
+import           Course.Functor
+import           Course.List
+import           Course.Monad
+import           Course.Optional
+import           Course.State
+import qualified Data.Set           as S
+import qualified Prelude            as P
 
 -- $setup
 -- >>> import Test.QuickCheck
@@ -182,6 +182,7 @@ distinct' ::
 distinct' lst = flip eval' S.empty $ filtering exists lst
   where exists a = do
           set <- getT
+          putT (S.insert a set)
           return . not $ a `S.member` set
 
 
@@ -203,7 +204,7 @@ distinctF ::
 distinctF lst = sequence . go . distinct' $ lst
   where go lst' = emptyIfGt100 <$> lst'
         emptyIfGt100 a = case a > 100 of
-          True -> Empty
+          True  -> Empty
           False -> Full a
 
 
@@ -254,7 +255,7 @@ instance Monad f => Applicative (OptionalT f) where
       Full ff'' -> do
         fa' <- fa
         case fa' of
-          Empty -> pure Empty
+          Empty     -> pure Empty
           Full fa'' -> pure . Full $ ff'' fa''
 
 -- | Implement the `Monad` instance for `OptionalT f` given a Monad f.
@@ -265,7 +266,7 @@ instance Monad f => Monad (OptionalT f) where
   fa =<< OptionalT ma = OptionalT $ do
     ma' <- ma
     case ma' of
-      Empty -> pure Empty
+      Empty  -> pure Empty
       Full a -> runOptionalT . fa $ a
 
 -- | A `Logger` is a pair of a list of log values (`[l]`) and an arbitrary value (`a`).

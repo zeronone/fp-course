@@ -34,9 +34,6 @@ newtype State s a =
 
 -- Also known as Owl operator.
 -- Some call it the boobs operator, but DUDE that is offensive!!
-(.:) :: (b -> c) -> (a1 -> a -> b) -> a1 -> a -> c
-(.:) = (.) . (.)
-
 -- | Run the `State` seeded with `s` and retrieve the resulting state.
 --
 -- prop> \(Fun _ f) s -> exec (State f) s == snd (runState (State f) s)

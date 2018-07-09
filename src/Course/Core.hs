@@ -44,6 +44,7 @@ module Course.Core(
 , module Data.Char
 , ifThenElse
 , bool
+, (.:)
 ) where
 
 
@@ -118,4 +119,7 @@ bool f _ False =
   f
 bool _ t True =
   t
+
+(.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+(.:) = (.) . (.)
 
